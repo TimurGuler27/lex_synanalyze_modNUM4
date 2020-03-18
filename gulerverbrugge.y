@@ -36,6 +36,11 @@ stack<SYMBOL_TABLE> scopeStack;    // stack of scope hashtables
 #define INT_OR_BOOL 5
 #define STR_OR_BOOL 6
 #define INT_OR_STR_OR_BOOL 7
+
+#define ARITHMETIC_OP 97
+#define LOGICAL_OP 98
+#define RELATIONAL_OP 99
+
 #define NOT_APPLICABLE -1
 
 void beginScope();
@@ -77,7 +82,7 @@ extern "C"
 %token  T_INTCONST T_STRCONST T_T T_NIL T_IDENT T_UNKNOWN
 
 %type <text> T_IDENT
-%type <typeInfo> N_CONST N_EXPR N_PARENTHESIZED_EXPR N_IF_EXPR
+%type <typeInfo> N_CONST N_EXPR N_PARENTHESIZED_EXPR N_IF_EXPR N_BIN_OP
 
 /*
  *	Starting point.
@@ -93,6 +98,7 @@ N_START		: // epsilon
 			}
 			| N_START N_EXPR
 			{
+			printf("\n---- Completed parsing ----\n\n");
 			}
 			;
 N_EXPR		: N_CONST
@@ -103,8 +109,12 @@ N_EXPR		: N_CONST
 			}
             | T_IDENT
             {
-			if (findEntryInAnyScope(string($1)).type != NOT_APPLICABLE) 
+			TYPE_INFO found = findEntryInAnyScope(string($1));
+			if (found.type != NOT_APPLICABLE) 
 				yyerror("Undefined identifier");
+			$$.type = found.type; 
+			$$.numParams = found.numParams;
+			$$.returnType = found.returnType;
 			}
             | T_LPAREN N_PARENTHESIZED_EXPR T_RPAREN
             {
@@ -133,31 +143,52 @@ N_CONST		: T_INTCONST
 			}
             | T_NIL
             {
-			$$.type = UNDEFINED;
+			$$.type = BOOL;
 			$$.numParams = NOT_APPLICABLE;
 			$$.returnType = NOT_APPLICABLE;
 			}
 			;
 N_PARENTHESIZED_EXPR	: N_ARITHLOGIC_EXPR 
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
             	| N_IF_EXPR 
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
             	| N_LET_EXPR 
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
                 | N_LAMBDA_EXPR 
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
                 | N_PRINT_EXPR 
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
                 | N_INPUT_EXPR 
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
             	| N_PROGN_OR_USERFUNCTCALL 
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
 				| T_EXIT
 				{
@@ -182,6 +213,11 @@ N_FUNCT_NAME	: T_PROGN
                      	;
 N_ARITHLOGIC_EXPR	: N_UN_OP N_EXPR
 				{
+				if($2.type == FUNCTION)
+					yyerror("Arg 1 cannot be a function");
+				$$.type = BOOL;
+				$$.numParams = NOT_APPLICABLE;
+				$$.returnType = NOT_APPLICABLE;
 				}
 				| N_BIN_OP N_EXPR N_EXPR
 				{
@@ -211,12 +247,12 @@ N_ID_EXPR_LIST  : /* epsilon */
 			;
 N_LAMBDA_EXPR   : T_LAMBDA T_LPAREN N_ID_LIST T_RPAREN N_EXPR
 			{
-=			endScope();
+			endScope();
 			}
 			;
 N_ID_LIST       : /* epsilon */
 			{
-=			}
+			}
             | N_ID_LIST T_IDENT 
 			{
 			string lexeme = string($2);
