@@ -32,12 +32,22 @@ public:
   // If a SYMBOL_TABLE_ENTRY with name theName is
   // found in this symbol table, then return true;
   // otherwise, return false.
-  bool findEntry(string theName) 
+  TYPE_INFO findEntry(string theName) 
   {
+    TYPE_INFO info = {UNDEFINED, UNDEFINED, UNDEFINED};
     map<string, SYMBOL_TABLE_ENTRY>::iterator itr;
     if ((itr = hashTable.find(theName)) == hashTable.end())
-      return(false);
-    else return(true);
+    {
+      return(info);
+    }
+    else
+    {
+      SYMBOL_TABLE_ENTRY x = itr->second;
+      info.type = x.getTypeCode();
+      info.numParams = x.getNumParam();
+      info.returnType = x.getReturnT();
+      return(info);
+    }
   }
 
 };

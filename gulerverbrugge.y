@@ -27,6 +27,17 @@ int lineNum = 1; 	// line # being processed
 
 stack<SYMBOL_TABLE> scopeStack;    // stack of scope hashtables
 
+#define UNDEFINED  -1   // Type codes
+#define FUNCTION 0
+#define INT 1
+#define STR 2
+#define INT_OR_STR 3
+#define BOOL 4
+#define INT_OR_BOOL 5
+#define STR_OR_BOOL 6
+#define INT_OR_STR_OR_BOOL 7
+#define NOT_APPLICABLE -1
+
 void beginScope();
 void endScope();
 void cleanUp();
@@ -53,6 +64,7 @@ extern "C"
 %union 
 {
   char* text;
+  TYPE_INFO typeInfo;
 };
 
 /*
@@ -65,6 +77,7 @@ extern "C"
 %token  T_INTCONST T_STRCONST T_T T_NIL T_IDENT T_UNKNOWN
 
 %type <text> T_IDENT
+%type <typeInfo> N_CONST N_EXPR N_PARENTHESIZED_EXPR N_IF_EXPR
 
 /*
  *	Starting point.
@@ -84,27 +97,45 @@ N_START		: // epsilon
 			;
 N_EXPR		: N_CONST
 			{
+			$$.type = $1.type; 
+			$$.numParams = $1.numParams;
+			$$.returnType = $1.returnType;
 			}
             | T_IDENT
             {
-			if (!findEntryInAnyScope(string($1))) 
+			if (findEntryInAnyScope(string($1)).type != NOT_APPLICABLE) 
 				yyerror("Undefined identifier");
 			}
             | T_LPAREN N_PARENTHESIZED_EXPR T_RPAREN
             {
+			$$.type = $2.type; 
+			$$.numParams = $2.numParams;
+			$$.returnType = $2.returnType;
 			}
 			;
 N_CONST		: T_INTCONST
 			{
+			$$.type = INT;
+			$$.numParams = NOT_APPLICABLE;
+			$$.returnType = NOT_APPLICABLE;
 			}
             | T_STRCONST
 			{
+			$$.type = STR;
+			$$.numParams = NOT_APPLICABLE;
+			$$.returnType = NOT_APPLICABLE;
 			}
             | T_T
             {
+			$$.type = BOOL;
+			$$.numParams = NOT_APPLICABLE;
+			$$.returnType = NOT_APPLICABLE;
 			}
             | T_NIL
             {
+			$$.type = UNDEFINED;
+			$$.numParams = NOT_APPLICABLE;
+			$$.returnType = NOT_APPLICABLE;
 			}
 			;
 N_PARENTHESIZED_EXPR	: N_ARITHLOGIC_EXPR 
@@ -133,16 +164,19 @@ N_PARENTHESIZED_EXPR	: N_ARITHLOGIC_EXPR
 				bail();
 				}
 				;
-N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_EXPR_LIST
+N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_ACTUAL_PARAMS
+				{
+				}
+				| T_LPAREN N_LAMBDA_EXPR T_RPAREN N_ACTUAL_PARAMS
 				{
 				}
 				;
-N_FUNCT_NAME		: T_PROGN
+N_FUNCT_NAME	: T_PROGN
 				{
 				}
 				| T_IDENT
 				{
-				if (!findEntryInAnyScope(string($1))) 
+				if (findEntryInAnyScope(string($1)).type != NOT_APPLICABLE) 
 				  yyerror("Undefined identifier");
 				}
                      	;
@@ -171,7 +205,7 @@ N_ID_EXPR_LIST  : /* epsilon */
 			printf("___Adding %s to symbol table\n", $3);
 			bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme,
 																		UNDEFINED));
-			if (! success) 
+			if (!success) 
 				yyerror("Multiply defined identifier");
 			}
 			;
@@ -186,11 +220,11 @@ N_ID_LIST       : /* epsilon */
             | N_ID_LIST T_IDENT 
 			{
 			string lexeme = string($2);
-                	printf("___Adding %s to symbol table\n", $2);
-                	bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme, 
-									    UNDEFINED));
-                	if (! success) 
-               	  yyerror("Multiply defined identifier");
+			printf("___Adding %s to symbol table\n", $2);
+			bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme, 
+								UNDEFINED));
+			if (! success) 
+				yyerror("Multiply defined identifier");
 			}
 			;
 N_PRINT_EXPR    : T_PRINT N_EXPR
@@ -263,6 +297,13 @@ N_UN_OP	     : T_NOT
 			{
 			}
 			;
+N_ACTUAL_PARAMS	: //epsilon
+				{
+				}
+				| N_EXPR_LIST
+				{
+				}
+				;
 %%
 
 #include "lex.yy.c"
@@ -286,19 +327,20 @@ void endScope()
   printf("\n___Exiting scope...\n\n");
 }
 
-bool findEntryInAnyScope(const string theName) 
+TYPE_INFO findEntryInAnyScope(const string theName) 
 {
-  if (scopeStack.empty( )) return(false);
-  bool found = scopeStack.top().findEntry(theName);
-  if (found)
-    return(true);
+  TYPE_INFO info = {UNDEFINED, UNDEFINED, UNDEFINED};
+  if (scopeStack.empty( )) return(info);
+  info = scopeStack.top().findEntry(theName);
+  if (info.type != UNDEFINED)
+    return(info);
   else 
   { // check in "next higher" scope
     SYMBOL_TABLE symbolTable = scopeStack.top( );
     scopeStack.pop( );
-    found = findEntryInAnyScope(theName);
+    info = findEntryInAnyScope(theName);
     scopeStack.push(symbolTable); // restore the stack
-    return(found);
+    return(info);
   }
 }
 
