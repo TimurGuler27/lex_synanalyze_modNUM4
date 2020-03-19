@@ -98,6 +98,34 @@ N_START		: // epsilon
 			}
 			| N_START N_EXPR
 			{
+			char* typeString = "";
+			switch($2.type)
+			{
+				case INT:
+					typeString = "INT";
+					break;
+				case STR:
+					typeString = "STR";
+					break;
+				case BOOL:
+					typeString = "BOOL";
+					break;
+				case INT_OR_STR:
+					typeString = "INT_OR_STR";
+					break;
+				case STR_OR_BOOL:
+					typeString = "STR_OR_BOOL";
+					break;
+				case INT_OR_BOOL:
+					typeString = "INT_OR_BOOL";
+					break;
+				case INT_OR_STR_OR_BOOL:
+					typeString = "INT_OR_STR_OR_BOOL";
+					break;
+				default:
+					typeString = "UNDEFINED";
+			}
+			printf("EXPR type is: %s", typeString);
 			printf("\n---- Completed parsing ----\n\n");
 			}
 			;
