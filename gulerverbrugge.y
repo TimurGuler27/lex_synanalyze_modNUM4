@@ -259,7 +259,8 @@ N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_ACTUAL_PARAMS
 				{
 					if($2.numParams > $4.numParams)
 					{
-						yyerror("Too many parameters in function call");
+						printf("Lambda: %d Actual: %d\n", $2.numParams, $4.numParams);
+						yyerror("Too many parameters in function call lambda");
 					}
 					else if($4.numParams > $2.numParams)
 					{
@@ -268,14 +269,6 @@ N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_ACTUAL_PARAMS
 					$$.type = $2.returnType;
 					$$.returnType = NOT_APPLICABLE;
 					$$.numParams = NOT_APPLICABLE;
-
-					/*type evaluation */
-					/*
-					string lexeme = string($2);
-					printf("___Adding %s to symbol table\n", $2);
-					bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme,
-																		$2.type, $4.numParams, NOT_APPLICABLE));
-					*/
 				}
 				;
 N_FUNCT_NAME	: T_PROGN
@@ -404,7 +397,7 @@ N_LET_EXPR  : T_LETSTAR T_LPAREN N_ID_EXPR_LIST T_RPAREN N_EXPR
 			endScope();
 			}
 			;
-N_ID_EXPR_LIST  : /* epsilon */
+N_ID_EXPR_LIST  : /* epsilon */////////////////////////////
 			{
 			}
             | N_ID_EXPR_LIST T_LPAREN T_IDENT N_EXPR T_RPAREN 
@@ -424,13 +417,12 @@ N_LAMBDA_EXPR   : T_LAMBDA T_LPAREN N_ID_LIST T_RPAREN N_EXPR
 			
 			$$.returnType = $5.type;
 			$$.type = FUNCTION;
-			int num = scopeStack.size();
+			int num = scopeStack.top().getSize();
 			$$.numParams = num;
-
 			endScope();
 			}
 			;
-N_ID_LIST       : /* epsilon */
+N_ID_LIST       : /* epsilon *//////////////////////
 			{
 			}
             | N_ID_LIST T_IDENT 
@@ -468,6 +460,7 @@ N_EXPR_LIST : N_EXPR N_EXPR_LIST
 			{
 				//first production
 				$$.type = $2.type;
+				printf("Num: %d", $2.numParams);
 				$$.numParams = $2.numParams;
 				$$.returnType = $2.returnType;
 			}
@@ -475,6 +468,7 @@ N_EXPR_LIST : N_EXPR N_EXPR_LIST
 			{
 				//second production
 				$$.type = $1.type;
+				printf("Num: %d", $1.numParams);
 				$$.numParams = $1.numParams;
 				$$.returnType = $1.returnType;
 			}
@@ -540,7 +534,7 @@ N_UN_OP	     : T_NOT
 N_ACTUAL_PARAMS	: //epsilon
 				{
 				$$.type = NOT_APPLICABLE;
-				$$.numParams = NOT_APPLICABLE;
+				$$.numParams = 0;
 				$$.returnType = NOT_APPLICABLE;
 				}
 				| N_EXPR_LIST

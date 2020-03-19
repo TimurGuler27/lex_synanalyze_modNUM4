@@ -50,6 +50,11 @@ public:
     }
   }
 
+  int getSize()
+  {
+    return hashTable.size();
+  }
+
 };
 
 #endif  // SYMBOL_TABLE_H
