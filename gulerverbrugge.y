@@ -82,7 +82,7 @@ extern "C"
 %token  T_INTCONST T_STRCONST T_T T_NIL T_IDENT T_UNKNOWN
 
 %type <text> T_IDENT
-%type <typeInfo> N_CONST N_EXPR N_PARENTHESIZED_EXPR N_IF_EXPR N_BIN_OP
+%type <typeInfo> N_EXPR N_CONST N_PRINT_EXPR N_PARENTHESIZED_EXPR N_ARITHLOGIC_EXPR N_ACTUAL_PARAMS N_IF_EXPR N_LET_EXPR N_ID_EXPR_LIST N_FUNCT_NAME N_PROGN_OR_USERFUNCTCALL N_LAMBDA_EXPR N_ID_LIST N_INPUT_EXPR N_EXPR_LIST N_BIN_OP N_ARITH_OP N_LOG_OP N_REL_OP
 
 /*
  *	Starting point.
@@ -240,7 +240,7 @@ N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_ACTUAL_PARAMS
 					$$.type = $2.returnType;
 					$$.returnType = NOT_APPLICABLE;
 					$$.numParams = NOT_APPLICABLE;
-					
+
 					/*type evaluation */
 					/*
 					string lexeme = string($2);
@@ -286,11 +286,11 @@ N_ARITHLOGIC_EXPR	: N_UN_OP N_EXPR
 					{
 							if($2.type != INT)
 							{
-								yyerror("Arg 1 must be integer);
+								yyerror("Arg 1 must be integer");
 							}
 							else if($3.type != INT)
 							{
-								yyerror("Arg 2 must be integer);
+								yyerror("Arg 2 must be integer");
 							}
 							else
 							{
