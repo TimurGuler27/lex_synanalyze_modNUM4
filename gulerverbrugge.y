@@ -48,7 +48,7 @@ void endScope();
 void cleanUp();
 void prepareToTerminate();
 void bail();
-bool findEntryInAnyScope(const string theName);
+TYPE_INFO findEntryInAnyScope(const string theName);
 
 void printRule(const char*, const char*);
 int yyerror(const char* s) 
@@ -410,7 +410,7 @@ N_ID_LIST       : /* epsilon */
 			
 			/*type evaluation*/
 			string lexeme = string($2);
-			printf("__Adding $s to symbol table\n", $2);
+			printf("__Adding %s to symbol table\n", $2);
 			bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme,
 																		INT_OR_STR_OR_BOOL,NOT_APPLICABLE, NOT_APPLICABLE));
 			

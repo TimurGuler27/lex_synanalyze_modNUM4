@@ -127,7 +127,6 @@ COMMENT           ";".*$
                 }
 {COMMENT}		{ }
 .			{
-			       yytext);
 			return T_UNKNOWN;
 			}
 
