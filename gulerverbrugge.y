@@ -29,13 +29,13 @@ stack<SYMBOL_TABLE> scopeStack;    // stack of scope hashtables
 
 #define UNDEFINED  -1   // Type codes
 #define FUNCTION 0
-#define INT 1
-#define STR 2
-#define INT_OR_STR 3
-#define BOOL 4
-#define INT_OR_BOOL 5
-#define STR_OR_BOOL 6
-#define INT_OR_STR_OR_BOOL 7
+#define INT 1					//01
+#define STR 2					//10  $2.type | $3.type.. $2.type is int and $3.type is str so 01 | 10 = 11
+#define INT_OR_STR 3			//11
+#define BOOL 4				   //100
+#define INT_OR_BOOL 5		   //101
+#define STR_OR_BOOL 6		   //110
+#define INT_OR_STR_OR_BOOL 7   //111
 
 #define ARITHMETIC_OP 97
 #define LOGICAL_OP 98
@@ -197,38 +197,182 @@ N_PARENTHESIZED_EXPR	: N_ARITHLOGIC_EXPR
 				;
 N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_ACTUAL_PARAMS
 				{
+					if($1.type != FUNCTION)
+					{
+						if($2.type == NOT_APPLICABLE)
+						{
+							$$.type = BOOL;
+							$$.numParams = NOT_APPLICABLE;
+							$$.returnType = NOT_APPLICABLE;
+						}
+						else
+						{
+							$$.type = $2.type;
+							$$.numParams = $2.numParams;
+							$$.returnType = $2.returnType;
+						}
+					}
+					else if($1.numParams > $2.numParams)
+					{
+						yyerror("Too many parameters in function call");
+					}
+					else if($2.numParams > $1.numParams)
+					{
+						yyerror("Too few parameters in function call");
+					}
+					else if($1.type == FUNCTION)
+					{
+						$$.type = $1.returnType;
+						$$.returnType = NOT_APPLICABLE;
+						$$.numParams = NOT_APPLICABLE;
+					}
 				}
 				| T_LPAREN N_LAMBDA_EXPR T_RPAREN N_ACTUAL_PARAMS
 				{
+					if($2.numParams > $4.numParams)
+					{
+						yyerror("Too many parameters in function call");
+					}
+					else if($4.numParams > $2.numParams)
+					{
+						yyerror("Too few parameters in function call");
+					}
+					$$.type = $2.returnType;
+					$$.returnType = NOT_APPLICABLE;
+					$$.numParams = NOT_APPLICABLE;
+					
+					/*type evaluation */
+					/*
+					string lexeme = string($2);
+					printf("___Adding %s to symbol table\n", $2);
+					bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme,
+																		$2.type, $4.numParams, NOT_APPLICABLE));
+					*/
 				}
 				;
 N_FUNCT_NAME	: T_PROGN
 				{
+				$$.type = NOT_APPLICABLE;
+				$$.returnType = NOT_APPLICABLE;
+				$$.numParams = NOT_APPLICABLE;
 				}
 				| T_IDENT
 				{
-				if (findEntryInAnyScope(string($1)).type != NOT_APPLICABLE) 
+				TYPE_INFO info = findEntryInAnyScope(string($1));
+				if (info.type != NOT_APPLICABLE) 
+				{
 				  yyerror("Undefined identifier");
 				}
-                     	;
+				else if(info.type != FUNCTION)
+				{
+					yyerror("Arg 1 must be function");
+				}
+				$$.returnType = info.returnType;
+				$$.numParams = info.numParams;
+				$$.type = FUNCTION;
+				}
+                ;
 N_ARITHLOGIC_EXPR	: N_UN_OP N_EXPR
 				{
-				if($2.type == FUNCTION)
-					yyerror("Arg 1 cannot be a function");
-				$$.type = BOOL;
-				$$.numParams = NOT_APPLICABLE;
-				$$.returnType = NOT_APPLICABLE;
+					if($2.type == FUNCTION)
+						yyerror("Arg 1 cannot be a function");
+					$$.type = BOOL;
+					$$.numParams = NOT_APPLICABLE;
+					$$.returnType = NOT_APPLICABLE;
 				}
 				| N_BIN_OP N_EXPR N_EXPR
 				{
+					if($1.type == ARITHMETIC_OP)
+					{
+							if($2.type != INT)
+							{
+								yyerror("Arg 1 must be integer);
+							}
+							else if($3.type != INT)
+							{
+								yyerror("Arg 2 must be integer);
+							}
+							else
+							{
+								$$.type = INT;
+								$$.returnType = NOT_APPLICABLE;
+								$$.numParams = NOT_APPLICABLE;
+							}
+					}
+					else if($1.type == LOGICAL_OP)
+					{
+						if($2.type == FUNCTION)
+						{
+							yyerror("Arg 1 cannot be function");
+						}
+						else if($3.type == FUNCTION)
+						{
+							yyerror("Arg 2 cannot be function");
+						}
+						else
+						{
+							$$.type = BOOL;
+							$$.returnType = NOT_APPLICABLE;
+							$$.numParams = NOT_APPLICABLE;	
+						}
+					}
+					else if($1.type == RELATIONAL_OP)
+					{
+						if($1.type == FUNCTION || $2.type == BOOL)
+						{
+							yyerror("Arg 1 must be integer or string");
+						}
+						else if($1.type == INT && $2.type != INT)
+						{
+							yyerror("Arg 2 must be integer");
+						}
+						else if($1.type = STR && $2.type != STR)
+						{
+							yyerror("Arg 2 must be string");
+						}
+						else
+						{
+							$$.type = BOOL;
+							$$.returnType = NOT_APPLICABLE;
+							$$.numParams = NOT_APPLICABLE;	
+						}
+					}
 				}
                      	;
 N_IF_EXPR   : T_IF N_EXPR N_EXPR N_EXPR
 			{
+				/*table should be implemented here*/
+				/*check to make sure no functions are present as arguments*/
+				if($2.type == FUNCTION)
+				{
+					yyerror("Arg 1 cannot be function");
+				}
+				if($3.type == FUNCTION)
+				{
+					yyerror("Arg 2 cannot be function");
+				}
+				if($4.type == FUNCTION)
+				{
+					yyerror("Arg 3 cannot be function");
+				}
+				
+				/*table implementation*/
+
+				$$.type = $3.type | $4.type;
+				$$.numParams = NOT_APPLICABLE;
+				$$.returnType = NOT_APPLICABLE;				
 			}
 			;
 N_LET_EXPR  : T_LETSTAR T_LPAREN N_ID_EXPR_LIST T_RPAREN N_EXPR
 			{
+
+			/*type evaluation*/
+			if($5.type == FUNCTION)
+			{
+				yyerror("Arg 5 cannot be function");
+			}
+			$$.type = $5.type;
+			
 			endScope();
 			}
 			;
@@ -237,16 +381,24 @@ N_ID_EXPR_LIST  : /* epsilon */
 			}
             | N_ID_EXPR_LIST T_LPAREN T_IDENT N_EXPR T_RPAREN 
 			{
+
+			/*type evaluation*/
 			string lexeme = string($3);
 			printf("___Adding %s to symbol table\n", $3);
 			bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme,
-																		UNDEFINED));
+																		$4.type, $4.numParams, $4.returnType));
 			if (!success) 
 				yyerror("Multiply defined identifier");
 			}
 			;
 N_LAMBDA_EXPR   : T_LAMBDA T_LPAREN N_ID_LIST T_RPAREN N_EXPR
 			{
+			
+			$$.returnType = $5.type;
+			$$.type = FUNCTION;
+			int num = scopeStack.size();
+			$$.numParams = num;
+
 			endScope();
 			}
 			;
@@ -255,45 +407,69 @@ N_ID_LIST       : /* epsilon */
 			}
             | N_ID_LIST T_IDENT 
 			{
+			
+			/*type evaluation*/
 			string lexeme = string($2);
-			printf("___Adding %s to symbol table\n", $2);
-			bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme, 
-								UNDEFINED));
+			printf("__Adding $s to symbol table\n", $2);
+			bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme,
+																		INT_OR_STR_OR_BOOL,NOT_APPLICABLE, NOT_APPLICABLE));
+			
 			if (! success) 
 				yyerror("Multiply defined identifier");
 			}
 			;
 N_PRINT_EXPR    : T_PRINT N_EXPR
 			{
+			if($2.type == FUNCTION)
+			{
+				yyerror("Arg 1 cannot be a function");
+			}
+			$$.type = $2.type;
+			$$.numParams = NOT_APPLICABLE;
+			$$.returnType = NOT_APPLICABLE;
 			}
 			;
 N_INPUT_EXPR    : T_INPUT
 			{
+			$$.type = INT_OR_STR;
+			$$.numParams = NOT_APPLICABLE;
+			$$.returnType = NOT_APPLICABLE;
 			}
 			;
 N_EXPR_LIST : N_EXPR N_EXPR_LIST  
 			{
+				//first production
+				$$.type = $2.type;
+				$$.numParams = $2.numParams;
+				$$.returnType = $2.returnType;
 			}
-            | /* epsilon */
+            | N_EXPR
 			{
+				//second production
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 			}
 			;
-N_BIN_OP	     : N_ARITH_OP
+N_BIN_OP	: N_ARITH_OP
 			{
+			$$.type = ARITHMETIC_OP;
 			}
 			|
 			N_LOG_OP
 			{
+			$$.type = LOGICAL_OP;
 			}
 			|
 			N_REL_OP
 			{
+			$$.type = RELATIONAL_OP;
 			}
 			;
-N_ARITH_OP	     : T_ADD
+N_ARITH_OP	: T_ADD
 			{
 			}
-                | T_SUB
+            | T_SUB
 			{
 			}
 			| T_MULT
@@ -335,9 +511,15 @@ N_UN_OP	     : T_NOT
 			;
 N_ACTUAL_PARAMS	: //epsilon
 				{
+				$$.type = NOT_APPLICABLE;
+				$$.numParams = NOT_APPLICABLE;
+				$$.returnType = NOT_APPLICABLE;
 				}
 				| N_EXPR_LIST
 				{
+				$$.type = $1.type;
+				$$.numParams = $1.numParams;
+				$$.returnType = $1.returnType;
 				}
 				;
 %%
