@@ -138,7 +138,7 @@ N_EXPR		: N_CONST
             | T_IDENT
             {
 			TYPE_INFO found = findEntryInAnyScope(string($1));
-			if (found.type != NOT_APPLICABLE) 
+			if (found.type == NOT_APPLICABLE) 
 				yyerror("Undefined identifier");
 			$$.type = found.type; 
 			$$.numParams = found.numParams;
@@ -280,7 +280,7 @@ N_FUNCT_NAME	: T_PROGN
 				| T_IDENT
 				{
 				TYPE_INFO info = findEntryInAnyScope(string($1));
-				if (info.type != NOT_APPLICABLE) 
+				if (info.type == NOT_APPLICABLE) 
 				{
 				  yyerror("Undefined identifier");
 				}
@@ -305,11 +305,11 @@ N_ARITHLOGIC_EXPR	: N_UN_OP N_EXPR
 				{
 					if($1.type == ARITHMETIC_OP)
 					{
-							if($2.type != INT)
+							if(!($2.type & INT))
 							{
 								yyerror("Arg 1 must be integer");
 							}
-							else if($3.type != INT)
+							else if(!($3.type & INT))
 							{
 								yyerror("Arg 2 must be integer");
 							}
@@ -343,11 +343,11 @@ N_ARITHLOGIC_EXPR	: N_UN_OP N_EXPR
 						{
 							yyerror("Arg 1 must be integer or string");
 						}
-						else if($1.type == INT && $2.type != INT)
+						else if(($1.type & INT) && !($2.type & INT))
 						{
 							yyerror("Arg 2 must be integer");
 						}
-						else if($1.type = STR && $2.type != STR)
+						else if(($1.type & STR) && !($2.type & STR))
 						{
 							yyerror("Arg 2 must be string");
 						}
@@ -414,7 +414,11 @@ N_ID_EXPR_LIST  : /* epsilon */////////////////////////////
 			;
 N_LAMBDA_EXPR   : T_LAMBDA T_LPAREN N_ID_LIST T_RPAREN N_EXPR
 			{
-			
+			if($5.type == FUNCTION)
+			{
+				endScope();
+				yyerror("Arg 2 cannot be functions");
+			}
 			$$.returnType = $5.type;
 			$$.type = FUNCTION;
 			int num = scopeStack.top().getSize();
@@ -430,7 +434,7 @@ N_ID_LIST       : /* epsilon *//////////////////////
 			
 			/*type evaluation*/
 			string lexeme = string($2);
-			printf("__Adding %s to symbol table\n", $2);
+			printf("___Adding %s to symbol table\n", $2);
 			bool success = scopeStack.top().addEntry(SYMBOL_TABLE_ENTRY(lexeme,
 																		INT_OR_STR_OR_BOOL,NOT_APPLICABLE, NOT_APPLICABLE));
 			
