@@ -24,11 +24,11 @@
 using namespace std;
 
 int lineNum = 1; 	// line # being processed
-
+int numExpressions = 0;
 stack<SYMBOL_TABLE> scopeStack;    // stack of scope hashtables
 
 #define UNDEFINED  -1   // Type codes
-#define FUNCTION 0
+#define FUNCTION 				   0
 #define INT 1					//01
 #define STR 2					//10  $2.type | $3.type.. $2.type is int and $3.type is str so 01 | 10 = 11
 #define INT_OR_STR 3			//11
@@ -101,6 +101,9 @@ N_START		: // epsilon
 			char* typeString = "";
 			switch($2.type)
 			{
+				case FUNCTION:
+					typeString = "FUNCTION";
+					break;
 				case INT:
 					typeString = "INT";
 					break;
@@ -240,11 +243,11 @@ N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_ACTUAL_PARAMS
 							$$.returnType = $2.returnType;
 						}
 					}
-					else if($1.numParams > $2.numParams)
+					else if($1.numParams > numExpressions)
 					{
 						yyerror("Too many parameters in function call");
 					}
-					else if($2.numParams > $1.numParams)
+					else if($2.numParams > numExpressions)
 					{
 						yyerror("Too few parameters in function call");
 					}
@@ -255,21 +258,21 @@ N_PROGN_OR_USERFUNCTCALL : N_FUNCT_NAME N_ACTUAL_PARAMS
 						$$.numParams = NOT_APPLICABLE;
 					}
 				}
-				| T_LPAREN N_LAMBDA_EXPR T_RPAREN N_ACTUAL_PARAMS
-				{
-					if($2.numParams > $4.numParams)
+				| T_LPAREN N_LAMBDA_EXPR T_RPAREN N_ACTUAL_PARAMS 
+				{ 
+					if($2.numParams < numExpressions)
 					{
-						printf("Lambda: %d Actual: %d\n", $2.numParams, $4.numParams);
-						yyerror("Too many parameters in function call lambda");
+						yyerror("Too many parameters in function call");
 					}
-					else if($4.numParams > $2.numParams)
+					else if(numExpressions < $2.numParams)
 					{
 						yyerror("Too few parameters in function call");
 					}
+
 					$$.type = $2.returnType;
 					$$.returnType = NOT_APPLICABLE;
 					$$.numParams = NOT_APPLICABLE;
-				}
+				} 
 				;
 N_FUNCT_NAME	: T_PROGN
 				{
@@ -286,7 +289,7 @@ N_FUNCT_NAME	: T_PROGN
 				}
 				else if(info.type != FUNCTION)
 				{
-					yyerror("Arg 1 must be function");
+					yyerror("Arg 1 must be a function");
 				}
 				$$.returnType = info.returnType;
 				$$.numParams = info.numParams;
@@ -324,11 +327,11 @@ N_ARITHLOGIC_EXPR	: N_UN_OP N_EXPR
 					{
 						if($2.type == FUNCTION)
 						{
-							yyerror("Arg 1 cannot be function");
+							yyerror("Arg 1 cannot be a function");
 						}
 						else if($3.type == FUNCTION)
 						{
-							yyerror("Arg 2 cannot be function");
+							yyerror("Arg 2 cannot be a function");
 						}
 						else
 						{
@@ -339,17 +342,17 @@ N_ARITHLOGIC_EXPR	: N_UN_OP N_EXPR
 					}
 					else if($1.type == RELATIONAL_OP)
 					{
-						if($1.type == FUNCTION || $2.type == BOOL)
+						if($2.type == FUNCTION || $2.type == BOOL)
 						{
 							yyerror("Arg 1 must be integer or string");
 						}
-						else if(($1.type & INT) && !($2.type & INT))
+						else if(($2.type & INT) && !($3.type & INT))
 						{
-							yyerror("Arg 2 must be integer");
+							yyerror("Arg 2 must be integer or string");
 						}
-						else if(($1.type & STR) && !($2.type & STR))
+						else if(($2.type & STR) && !($3.type & STR))
 						{
-							yyerror("Arg 2 must be string");
+							yyerror("Arg 2 must be integer or string");
 						}
 						else
 						{
@@ -366,15 +369,15 @@ N_IF_EXPR   : T_IF N_EXPR N_EXPR N_EXPR
 				/*check to make sure no functions are present as arguments*/
 				if($2.type == FUNCTION)
 				{
-					yyerror("Arg 1 cannot be function");
+					yyerror("Arg 1 cannot be a function");
 				}
 				if($3.type == FUNCTION)
 				{
-					yyerror("Arg 2 cannot be function");
+					yyerror("Arg 2 cannot be a function");
 				}
 				if($4.type == FUNCTION)
 				{
-					yyerror("Arg 3 cannot be function");
+					yyerror("Arg 3 cannot be a function");
 				}
 				
 				/*table implementation*/
@@ -390,10 +393,10 @@ N_LET_EXPR  : T_LETSTAR T_LPAREN N_ID_EXPR_LIST T_RPAREN N_EXPR
 			/*type evaluation*/
 			if($5.type == FUNCTION)
 			{
-				yyerror("Arg 5 cannot be function");
+				endScope();
+				yyerror("Arg 2 cannot be a function");
 			}
 			$$.type = $5.type;
-			
 			endScope();
 			}
 			;
@@ -412,12 +415,11 @@ N_ID_EXPR_LIST  : /* epsilon */////////////////////////////
 				yyerror("Multiply defined identifier");
 			}
 			;
-N_LAMBDA_EXPR   : T_LAMBDA T_LPAREN N_ID_LIST T_RPAREN N_EXPR
+N_LAMBDA_EXPR   : T_LAMBDA T_LPAREN N_ID_LIST T_RPAREN N_EXPR  //so I got everything but 1 to work
 			{
 			if($5.type == FUNCTION)
 			{
-				endScope();
-				yyerror("Arg 2 cannot be functions");
+				yyerror("Arg 2 cannot be a function");
 			}
 			$$.returnType = $5.type;
 			$$.type = FUNCTION;
@@ -458,23 +460,24 @@ N_INPUT_EXPR    : T_INPUT
 			$$.type = INT_OR_STR;
 			$$.numParams = NOT_APPLICABLE;
 			$$.returnType = NOT_APPLICABLE;
-			}
+			}//could we add the expression with an open scope but not actually say adding to symbol table? wait nvm,... it would make tracking them more confusing
 			;
 N_EXPR_LIST : N_EXPR N_EXPR_LIST  
 			{
-				//first production
-				$$.type = $2.type;
-				printf("Num: %d", $2.numParams);
-				$$.numParams = $2.numParams;
-				$$.returnType = $2.returnType;
+			//increment the numer of expressions by one as we still have expressions to evaluate
+			numExpressions += 1;
+			$$.type = $2.type;
+			$$.numParams = $2.numParams;
+			$$.returnType = $2.returnType;
+	
 			}
             | N_EXPR
 			{
-				//second production
-				$$.type = $1.type;
-				printf("Num: %d", $1.numParams);
-				$$.numParams = $1.numParams;
-				$$.returnType = $1.returnType;
+			//set the number of expressions to 1 as we are only evaluating 1 expression
+			numExpressions = 1;
+			$$.type = $1.type;
+			$$.numParams = $1.numParams;
+			$$.returnType = $1.returnType;			
 			}
 			;
 N_BIN_OP	: N_ARITH_OP
